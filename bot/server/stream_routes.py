@@ -78,6 +78,45 @@ async def create_route(request):
         return web.HTTPFound(f'/playlist?db={parent_dir}')
 
 
+# --- NEW ROUTE FOR DELETING INDIVIDUAL FILES ---
+@routes.post('/delete_file')
+async def delete_file_route(request):
+    session = await get_session(request)
+    if (username := session.get('user')) != Telegram.ADMIN_USERNAME:
+        return web.json_response({'success': False, 'msg': 'Unauthorized'}, status=403)
+
+    try:
+        data = await request.json()
+        chat_id_raw = data.get('chat_id') # e.g. "123456"
+        message_id = int(data.get('message_id')) # e.g. 105
+        
+        # Prepare IDs
+        # Telegram needs int -100xxx
+        target_chat_int = int(f"-100{chat_id_raw}")
+        # Database stores string "-100xxx"
+        target_chat_str = str(target_chat_int)
+
+        # 1. Delete from Telegram Channel
+        try:
+            await StreamBot.delete_messages(chat_id=target_chat_int, message_ids=message_id)
+        except Exception as e:
+            logging.error(f"Failed to delete from Telegram (might be missing): {e}")
+
+        # 2. Delete from Database
+        # Uses standard pymongo delete_one on the 'files' collection
+        await db.files.delete_one({"chat_id": target_chat_str, "msg_id": message_id})
+
+        # 3. Clear Cache
+        rm_cache(target_chat_str)
+
+        return web.json_response({'success': True})
+
+    except Exception as e:
+        logging.error(f"Error in delete_file route: {e}")
+        return web.json_response({'success': False, 'msg': str(e)}, status=500)
+# -----------------------------------------------
+
+
 @routes.post('/delete')
 async def delete_route(request):
     session = await get_session(request)
@@ -203,7 +242,6 @@ async def editConfig_route(request):
     if not success:
         return web.HTTPInternalServerError()
     return web.HTTPFound('/')
-
 
 
 @routes.get('/')
