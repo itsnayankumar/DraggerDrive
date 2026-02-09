@@ -52,29 +52,56 @@ async def get_files(chat_id, page=1):
         title, _ = splitext(title)
         title = re.sub(r'[.,|_\',]', ' ', title)
         posts.append({"msg_id": post.id, "title": title,
-                    "hash": file.file_unique_id[:6], "size": get_readable_file_size(file.file_size), "type": file.mime_type})
+                      "hash": file.file_unique_id[:6], "size": get_readable_file_size(file.file_size), "type": file.mime_type})
     save_cache(chat_id, {"posts": posts}, page)
     return posts
 
+
 async def posts_file(posts, chat_id):
+    # Prepare the Clean Chat ID (remove -100 prefix)
+    clean_chat_id = str(chat_id).replace("-100", "")
+
     phtml = """
-            <div class="col">
+    <div class="col">
+        <div class="card text-white bg-primary mb-3 position-relative" style="overflow: hidden;">
+            
+            <input type="checkbox" class="admin-only form-check-input position-absolute top-0 end-0 m-2"
+                onchange="checkSendButton()" id="selectCheckbox"
+                data-id="{id}|{hash}|{title}|{size}|{type}|{img}" style="z-index: 20;">
+            
+            <div style="position: relative;">
+                <img src="https://cdn.jsdelivr.net/gh/weebzone/weebzone/data/Surf-TG/src/loading.gif" 
+                     class="lzy_img card-img-top rounded-top"
+                     data-src="{img}" alt="{title}" 
+                     style="height: 160px; object-fit: cover; width: 100%;">
                 
-                    <div class="card text-white bg-primary mb-3">
-                        <input type="checkbox" class="admin-only form-check-input position-absolute top-0 end-0 m-2"
-                            onchange="checkSendButton()" id="selectCheckbox"
-                            data-id="{id}|{hash}|{title}|{size}|{type}|{img}">
-                        <img src="https://cdn.jsdelivr.net/gh/weebzone/weebzone/data/Surf-TG/src/loading.gif" class="lzy_img card-img-top rounded-top"
-                            data-src="{img}" alt="{title}">
-                        <a href="/watch/{chat_id}?id={id}&hash={hash}">
-                        <div class="card-body p-1">
-                            <h6 class="card-title">{title}</h6>
-                            <span class="badge bg-warning">{type}</span>
-                            <span class="badge bg-info">{size}</span>
-                        </div>
-                        </a>
-                    </div>
-                
+                <button onclick="event.preventDefault(); deleteFile('{clean_chat_id}', '{id}')" 
+                        class="btn btn-danger btn-sm position-absolute shadow-sm" 
+                        style="bottom: 8px; right: 8px; border-radius: 50%; width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center; z-index: 20;"
+                        title="Delete this file">
+                    🗑
+                </button>
             </div>
-"""
-    return ''.join(phtml.format(chat_id=str(chat_id).replace("-100", ""), id=post["msg_id"], img=f"/api/thumb/{chat_id}?id={post['msg_id']}", title=post["title"], hash=post["hash"], size=post['size'], type=post['type']) for post in posts)
+            
+            <a href="/watch/{clean_chat_id}?id={id}&hash={hash}" style="text-decoration: none; color: white;">
+                <div class="card-body p-2">
+                    <h6 class="card-title text-truncate" style="font-size: 0.9rem; margin-bottom: 5px;">{title}</h6>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="badge bg-warning text-dark" style="font-size: 0.7rem;">{type}</span>
+                        <span class="badge bg-info text-dark" style="font-size: 0.7rem;">{size}</span>
+                    </div>
+                </div>
+            </a>
+        </div>
+    </div>
+    """
+    
+    return ''.join(phtml.format(
+        clean_chat_id=clean_chat_id, 
+        id=post["msg_id"], 
+        img=f"/api/thumb/{clean_chat_id}?id={post['msg_id']}", 
+        title=post["title"], 
+        hash=post["hash"], 
+        size=post['size'], 
+        type=post['type']
+    ) for post in posts)
