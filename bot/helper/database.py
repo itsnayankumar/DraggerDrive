@@ -110,7 +110,6 @@ class Database:
                 "hash": hash, "title": name, "size": size, "type": file_type}
         self.files.insert_one(file)
 
-
     async def search_tgfiles(self, id, query, page=1, per_page=50):
         words = re.findall(r'\w+', query.lower())
         regex_pattern = '.*'.join(f'(?=.*{re.escape(word)})' for word in words)
@@ -123,3 +122,13 @@ class Database:
     
     async def add_btgfiles(self, data):
         result = self.files.insert_many(data)
+
+    # --- NEW FUNCTIONS FOR DELETING FILES ---
+
+    async def get_tgfile(self, id):
+        # Finds a file by its unique MongoDB _id
+        return self.files.find_one({'_id': ObjectId(id)})
+
+    async def delete_tgfile(self, id):
+        # Deletes a file from MongoDB by its unique _id
+        return self.files.delete_one({'_id': ObjectId(id)})
